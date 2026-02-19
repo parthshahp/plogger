@@ -1,4 +1,4 @@
-const CACHE_NAME = "plogger-cache-v1";
+const CACHE_NAME = "plogger-cache-v2";
 const PRECACHE_URLS = ["/", "/offline.html", "/icons/icon-192.png", "/icons/icon-512.png"];
 
 self.addEventListener("install", (event) => {
@@ -52,14 +52,15 @@ self.addEventListener("fetch", (event) => {
     const destination = request.destination;
     if (["script", "style", "image", "font"].includes(destination)) {
       event.respondWith(
-        caches.match(request).then((cached) =>
-          cached ||
-          fetch(request).then((response) => {
-            const responseClone = response.clone();
-            caches.open(CACHE_NAME).then((cache) => cache.put(request, responseClone));
+        fetch(request)
+          .then((response) => {
+            if (response.ok) {
+              const responseClone = response.clone();
+              caches.open(CACHE_NAME).then((cache) => cache.put(request, responseClone));
+            }
             return response;
           })
-        )
+          .catch(() => caches.match(request))
       );
     }
   }

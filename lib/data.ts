@@ -1,6 +1,8 @@
 import { db, type Entry, type Tag } from "./db";
 import { recordOplog } from "./oplog";
 
+const MIN_CALENDAR_ENTRY_MS = 15 * 60 * 1000;
+
 function newId(): string {
   if (typeof crypto !== "undefined" && "randomUUID" in crypto) {
     return crypto.randomUUID();
@@ -119,6 +121,45 @@ export async function startTimer({
   return payload.id;
 }
 
+export async function createEntryFromRange({
+  startAt,
+  endAt,
+  description,
+  tagIds,
+}: {
+  startAt: number;
+  endAt: number;
+  description: string;
+  tagIds: string[];
+}): Promise<string> {
+  const normalizedStart = Math.min(startAt, endAt);
+  const normalizedEnd = Math.max(startAt, endAt);
+  const durationMs = normalizedEnd - normalizedStart;
+
+  if (durationMs < MIN_CALENDAR_ENTRY_MS) {
+    throw new Error("Entry must be at least 15 minutes");
+  }
+
+  const now = Date.now();
+  const payload: Entry = {
+    id: newId(),
+    description: description.trim() || "Untitled",
+    tagIds,
+    startAt: normalizedStart,
+    endAt: normalizedEnd,
+    durationSec: Math.floor(durationMs / 1000),
+    createdAt: now,
+    updatedAt: now,
+  };
+
+  await db.transaction("rw", db.entries, db.oplog, async () => {
+    await db.entries.add(payload);
+    await recordOplog("entries", payload.id, "upsert", payload);
+  });
+
+  return payload.id;
+}
+
 export async function stopTimer(entryId: string): Promise<void> {
   const entry = await db.entries.get(entryId);
   if (!entry || entry.deletedAt || entry.endAt) {
@@ -178,6 +219,48 @@ export async function updateEntry({
       tagIds,
       updatedAt: now,
     });
+    const updated = await db.entries.get(id);
+    if (updated) {
+      await recordOplog("entries", id, "upsert", updated);
+    }
+  });
+}
+
+export async function shiftEntryByMs({
+  id,
+  deltaMs,
+}: {
+  id: string;
+  deltaMs: number;
+}): Promise<void> {
+  if (deltaMs === 0) return;
+
+  const existing = await db.entries.get(id);
+  if (!existing || existing.deletedAt) return;
+
+  const now = Date.now();
+  const nextStartAt = existing.startAt + deltaMs;
+
+  await db.transaction("rw", db.entries, db.oplog, async () => {
+    if (existing.endAt === null) {
+      await db.entries.update(id, {
+        startAt: nextStartAt,
+        updatedAt: now,
+      });
+    } else {
+      const nextEndAt = existing.endAt + deltaMs;
+      const durationSec = Math.max(
+        0,
+        Math.floor((nextEndAt - nextStartAt) / 1000)
+      );
+      await db.entries.update(id, {
+        startAt: nextStartAt,
+        endAt: nextEndAt,
+        durationSec,
+        updatedAt: now,
+      });
+    }
+
     const updated = await db.entries.get(id);
     if (updated) {
       await recordOplog("entries", id, "upsert", updated);

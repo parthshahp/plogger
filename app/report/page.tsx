@@ -136,9 +136,9 @@ export default function ReportPage() {
 
   return (
     <section className="space-y-6">
-      <div className="rounded-3xl border border-slate-800 bg-slate-900/70 p-8">
+      <div className="space-y-2">
         <h1 className="text-3xl font-semibold">Report</h1>
-        <p className="mt-2 text-slate-300">
+        <p className="text-muted-foreground">
           Totals by tag, plus today and rolling seven-day summaries.
         </p>
       </div>
@@ -152,26 +152,26 @@ export default function ReportPage() {
         />
       </div>
 
-      <div className="rounded-3xl border border-slate-800 bg-slate-900/40 p-6">
+      <div className="rounded-lg border bg-card p-6">
         <h2 className="text-lg font-semibold">Date range</h2>
-        <p className="mt-2 text-sm text-slate-400">
+        <p className="mt-2 text-sm text-muted-foreground">
           Pick a range to see totals by tag.
         </p>
         <div className="mt-4 grid gap-4 md:grid-cols-2">
           <div>
-            <label className="text-xs uppercase text-slate-500">Start</label>
+            <label className="text-xs uppercase text-muted-foreground">Start</label>
             <input
               type="date"
-              className="mt-2 w-full rounded-2xl border border-slate-700 bg-slate-950 px-4 py-3 text-sm text-slate-100 outline-none focus:border-slate-500"
+              className="mt-2 w-full rounded-md border bg-background px-4 py-3 text-sm outline-none focus-visible:border-ring focus-visible:ring-ring/50 focus-visible:ring-[3px]"
               value={rangeStart}
               onChange={(event) => setRangeStart(event.target.value)}
             />
           </div>
           <div>
-            <label className="text-xs uppercase text-slate-500">End</label>
+            <label className="text-xs uppercase text-muted-foreground">End</label>
             <input
               type="date"
-              className="mt-2 w-full rounded-2xl border border-slate-700 bg-slate-950 px-4 py-3 text-sm text-slate-100 outline-none focus:border-slate-500"
+              className="mt-2 w-full rounded-md border bg-background px-4 py-3 text-sm outline-none focus-visible:border-ring focus-visible:ring-ring/50 focus-visible:ring-[3px]"
               value={rangeEnd}
               onChange={(event) => setRangeEnd(event.target.value)}
             />
@@ -179,29 +179,25 @@ export default function ReportPage() {
         </div>
       </div>
 
-      <div className="rounded-3xl border border-slate-800 bg-slate-900/40 p-6">
+      <div className="rounded-lg border bg-card p-6">
         <h2 className="text-lg font-semibold">Totals by tag</h2>
         {(tagTotals.length === 0 && rangeEntries && rangeEntries.length === 0) ? (
-          <p className="mt-4 text-sm text-slate-400">No entries in this range.</p>
+          <p className="mt-4 text-sm text-muted-foreground">No entries in this range.</p>
         ) : (
           <div className="mt-4 space-y-3">
             {tagTotals.map((tag) => (
               <div
                 key={tag.id}
-                className="flex flex-wrap items-center justify-between gap-4 rounded-2xl border border-slate-800 bg-slate-950/40 px-4 py-3"
+                className="flex flex-wrap items-center justify-between gap-4 rounded-md border bg-background px-4 py-3"
               >
                 <div className="flex items-center gap-3">
                   <span
                     className="h-3 w-3 rounded-full"
                     style={{ backgroundColor: tag.color || "#64748b" }}
                   />
-                  <p className="text-sm font-medium text-slate-100">
-                    {tag.label}
-                  </p>
+                  <p className="text-sm font-medium">{tag.label}</p>
                 </div>
-                <p className="text-sm text-slate-200">
-                  {formatDuration(tag.duration)}
-                </p>
+                <p className="text-sm">{formatDuration(tag.duration)}</p>
               </div>
             ))}
           </div>
@@ -213,9 +209,9 @@ export default function ReportPage() {
 
 function SummaryCard({ label, value }: { label: string; value: string }) {
   return (
-    <div className="rounded-3xl border border-slate-800 bg-slate-900/40 p-6">
-      <p className="text-sm text-slate-400">{label}</p>
-      <p className="mt-2 text-xl font-semibold text-slate-100">{value}</p>
+    <div className="rounded-lg border bg-card p-6">
+      <p className="text-sm text-muted-foreground">{label}</p>
+      <p className="mt-2 text-xl font-semibold">{value}</p>
     </div>
   );
 }

@@ -1,6 +1,8 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { Geist, Geist_Mono } from "next/font/google";
+import EntriesNavLink from "@/components/entries-nav-link";
+import ThemeToggle from "@/components/theme-toggle";
 import "./globals.css";
 import SwRegister from "./sw-register";
 import SyncClient from "./sync-client";
@@ -34,7 +36,7 @@ export const metadata: Metadata = {
 };
 
 export const viewport = {
-  themeColor: "#0c121c",
+  themeColor: "#ffffff",
 };
 
 export default function RootLayout({
@@ -45,36 +47,46 @@ export default function RootLayout({
   return (
     <html lang="en">
       <body
-        className={`${geistSans.variable} ${geistMono.variable} antialiased bg-slate-950 text-slate-100`}
+        className={`${geistSans.variable} ${geistMono.variable} antialiased`}
       >
         <SwRegister />
         <SyncClient />
         <div className="min-h-screen">
-          <header className="border-b border-slate-800 bg-slate-950/80 backdrop-blur">
+          <header className="border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/80">
             <div className="mx-auto flex max-w-5xl items-center justify-between px-6 py-5">
               <div className="flex items-center gap-3">
-                <div className="h-10 w-10 rounded-2xl bg-slate-800" />
+                <div className="h-10 w-10 rounded-lg border bg-card" />
                 <div>
                   <p className="text-lg font-semibold">Plogger</p>
-                  <p className="text-xs text-slate-400">
+                  <p className="text-xs text-muted-foreground">
                     Local-first time tracking
                   </p>
                 </div>
               </div>
-              <nav className="flex items-center gap-4 text-sm">
-                <Link className="text-slate-200 hover:text-white" href="/">
-                  Dashboard
-                </Link>
-                <Link className="text-slate-200 hover:text-white" href="/entries">
-                  Entries
-                </Link>
-                <Link className="text-slate-200 hover:text-white" href="/tags">
-                  Tags
-                </Link>
-                <Link className="text-slate-200 hover:text-white" href="/report">
-                  Report
-                </Link>
-              </nav>
+              <div className="flex items-center gap-4">
+                <nav className="flex items-center gap-4 text-sm">
+                  <Link
+                    className="text-muted-foreground hover:text-foreground"
+                    href="/"
+                  >
+                    Dashboard
+                  </Link>
+                  <EntriesNavLink />
+                  <Link
+                    className="text-muted-foreground hover:text-foreground"
+                    href="/tags"
+                  >
+                    Tags
+                  </Link>
+                  <Link
+                    className="text-muted-foreground hover:text-foreground"
+                    href="/report"
+                  >
+                    Report
+                  </Link>
+                </nav>
+                <ThemeToggle />
+              </div>
             </div>
           </header>
           <main className="mx-auto max-w-5xl px-6 py-10">{children}</main>

@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { Geist, Geist_Mono } from "next/font/google";
+import CommandMenu from "@/components/command-menu";
 import EntriesNavLink from "@/components/entries-nav-link";
 import ThemeToggle from "@/components/theme-toggle";
 import "./globals.css";
@@ -85,6 +86,7 @@ export default function RootLayout({
                     Report
                   </Link>
                 </nav>
+                <CommandMenu />
                 <ThemeToggle />
               </div>
             </div>

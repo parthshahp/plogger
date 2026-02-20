@@ -2,6 +2,8 @@
 
 import { useMemo, useState, type PointerEvent } from "react";
 import { useLiveQuery } from "dexie-react-hooks";
+import { ChevronLeftIcon, ChevronRightIcon } from "lucide-react";
+import { Button } from "@/components/ui/button";
 import { db, type Entry, type Tag } from "@/lib/db";
 import { formatDuration } from "@/lib/time";
 
@@ -44,16 +46,28 @@ type DragState = {
 
 export function EntriesWeekCalendarView({
   now,
+  weekOffset,
   tagMap,
   onEdit,
+  onPrevWeek,
+  onNextWeek,
+  onCurrentWeek,
   onCreateRange,
 }: {
   now: number;
+  weekOffset: number;
   tagMap: Map<string, Tag>;
   onEdit: (entry: Entry) => void;
+  onPrevWeek: () => void;
+  onNextWeek: () => void;
+  onCurrentWeek: () => void;
   onCreateRange: (payload: { startAt: number; endAt: number }) => void;
 }) {
-  const weekStart = useMemo(() => startOfWeekSunday(new Date()), []);
+  const weekStart = useMemo(() => {
+    const base = new Date();
+    base.setDate(base.getDate() + weekOffset * 7);
+    return startOfWeekSunday(base);
+  }, [weekOffset]);
   const weekStartMs = weekStart.getTime();
   const weekEndExclusiveMs = weekStartMs + 7 * DAY_MS;
   const [dragState, setDragState] = useState<DragState | null>(null);
@@ -84,6 +98,9 @@ export function EntriesWeekCalendarView({
       }),
     [weekStartMs]
   );
+  const weekLabel = `${formatCalendarDate(days[0].date)} - ${formatCalendarDate(
+    days[6].date
+  )}`;
 
   const segmentsByDay = useMemo(() => {
     const buckets: RawSegment[][] = Array.from({ length: 7 }, () => []);
@@ -213,7 +230,22 @@ export function EntriesWeekCalendarView({
 
   return (
     <div className="space-y-3">
-      <h2 className="pl-2 text-lg font-semibold">Current week</h2>
+      <div className="flex flex-wrap items-center justify-between gap-3">
+        <h2 className="pl-2 text-lg font-semibold">{weekLabel}</h2>
+        <div className="flex items-center gap-2">
+          <Button type="button" size="sm" variant="outline" onClick={onPrevWeek}>
+            <ChevronLeftIcon className="size-4" />
+            Prev
+          </Button>
+          <Button type="button" size="sm" variant="outline" onClick={onCurrentWeek}>
+            Today
+          </Button>
+          <Button type="button" size="sm" variant="outline" onClick={onNextWeek}>
+            Next
+            <ChevronRightIcon className="size-4" />
+          </Button>
+        </div>
+      </div>
       <div className="overflow-x-auto rounded-md border bg-card">
         <div className="min-w-[680px] md:min-w-0 md:w-full">
           <div className="sticky top-0 z-20 grid grid-cols-[72px_repeat(7,minmax(0,1fr))] border-b bg-card">
@@ -416,6 +448,13 @@ function formatHour(hour: number) {
   const suffix = hour < 12 ? "AM" : "PM";
   const normalized = hour % 12 === 0 ? 12 : hour % 12;
   return `${normalized}${suffix}`;
+}
+
+function formatCalendarDate(date: Date) {
+  return new Intl.DateTimeFormat("en-US", {
+    month: "short",
+    day: "numeric",
+  }).format(date);
 }
 
 function floorToSnap(ms: number) {

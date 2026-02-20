@@ -160,6 +160,68 @@ export async function createEntryFromRange({
   return payload.id;
 }
 
+export async function createEntryWithTimes({
+  startAt,
+  endAt,
+  description,
+  tagIds,
+}: {
+  startAt: number;
+  endAt: number | null;
+  description: string;
+  tagIds: string[];
+}): Promise<string> {
+  if (!Number.isFinite(startAt)) {
+    throw new Error("Start time is required");
+  }
+
+  if (endAt !== null && !Number.isFinite(endAt)) {
+    throw new Error("End time is invalid");
+  }
+
+  if (endAt !== null && endAt < startAt) {
+    throw new Error("End time must be after start time");
+  }
+
+  const now = Date.now();
+  const payload: Entry = {
+    id: newId(),
+    description: description.trim() || "Untitled",
+    tagIds,
+    startAt,
+    endAt,
+    durationSec: endAt === null ? null : Math.floor((endAt - startAt) / 1000),
+    createdAt: now,
+    updatedAt: now,
+  };
+
+  await db.transaction("rw", db.entries, db.oplog, async () => {
+    if (endAt === null) {
+      const running = await db.entries
+        .filter((entry) => entry.endAt === null && !entry.deletedAt)
+        .first();
+
+      if (running) {
+        const durationSec = Math.max(0, Math.floor((now - running.startAt) / 1000));
+        await db.entries.update(running.id, {
+          endAt: now,
+          durationSec,
+          updatedAt: now,
+        });
+        const updatedRunning = await db.entries.get(running.id);
+        if (updatedRunning) {
+          await recordOplog("entries", running.id, "upsert", updatedRunning);
+        }
+      }
+    }
+
+    await db.entries.add(payload);
+    await recordOplog("entries", payload.id, "upsert", payload);
+  });
+
+  return payload.id;
+}
+
 export async function stopTimer(entryId: string): Promise<void> {
   const entry = await db.entries.get(entryId);
   if (!entry || entry.deletedAt || entry.endAt) {

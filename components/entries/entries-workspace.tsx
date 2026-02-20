@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useState, useTransition } from "react";
+import { useCallback, useMemo, useState, useTransition } from "react";
 import { useLiveQuery } from "dexie-react-hooks";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { EntriesListView } from "@/components/entries/entries-list-view";
@@ -12,36 +12,29 @@ import { EntriesWeekCalendarView } from "@/components/entries/entries-week-calen
 import { EntryFormModal } from "@/components/entries/entry-form-modal";
 import { db, type Entry, type Tag } from "@/lib/db";
 import {
-  createEntryFromRange,
+  createEntryWithTimes,
   deleteEntry,
   updateEntry,
   updateRunningEntry,
 } from "@/lib/data";
 
-const ENTRIES_VIEW_STORAGE_KEY = "plogger:entries:view";
-
 function buildTagMap(tags: Tag[]) {
   return new Map(tags.map((tag) => [tag.id, tag]));
-}
-
-function useNow(intervalMs: number) {
-  const [now, setNow] = useState(() => Date.now());
-
-  useEffect(() => {
-    const id = window.setInterval(() => setNow(Date.now()), intervalMs);
-    return () => window.clearInterval(id);
-  }, [intervalMs]);
-
-  return now;
 }
 
 function parseView(value: string | null): EntriesView {
   return value === "week" ? "week" : "list";
 }
 
-export default function EntriesPage() {
+function parseWeekOffset(value: string | null) {
+  if (!value) return 0;
+  const parsed = Number.parseInt(value, 10);
+  if (!Number.isFinite(parsed)) return 0;
+  return parsed;
+}
+
+export default function EntriesWorkspace({ now }: { now: number }) {
   const [, startTransition] = useTransition();
-  const now = useNow(1000);
   const [editingEntry, setEditingEntry] = useState<Entry | null>(null);
   const [creatingRange, setCreatingRange] = useState<{
     startAt: number;
@@ -52,6 +45,7 @@ export default function EntriesPage() {
   const pathname = usePathname();
   const router = useRouter();
   const view = parseView(searchParams.get("view"));
+  const weekOffset = parseWeekOffset(searchParams.get("weekOffset"));
 
   const tags = useLiveQuery(() =>
     db.tags.orderBy("name").filter((tag) => !tag.deletedAt).toArray()
@@ -68,29 +62,33 @@ export default function EntriesPage() {
 
   const tagMap = useMemo(() => buildTagMap(tags ?? []), [tags]);
 
-  const setView = useCallback((nextView: EntriesView) => {
-    window.localStorage.setItem(ENTRIES_VIEW_STORAGE_KEY, nextView);
-
-    const params = new URLSearchParams(searchParams.toString());
-
-    if (nextView === "list") {
-      params.delete("view");
-    } else {
+  const setView = useCallback(
+    (nextView: EntriesView) => {
+      const params = new URLSearchParams(searchParams.toString());
       params.set("view", nextView);
-    }
+      if (nextView !== "week") {
+        params.delete("weekOffset");
+      } else if (!params.get("weekOffset")) {
+        params.set("weekOffset", "0");
+      }
 
-    const query = params.toString();
-    router.replace(query ? `${pathname}?${query}` : pathname);
-  }, [pathname, router, searchParams]);
+      const query = params.toString();
+      router.replace(query ? `${pathname}?${query}` : pathname);
+    },
+    [pathname, router, searchParams]
+  );
 
-  useEffect(() => {
-    if (searchParams.get("view")) return;
+  const setWeekOffset = useCallback(
+    (nextOffset: number) => {
+      const params = new URLSearchParams(searchParams.toString());
+      params.set("view", "week");
+      params.set("weekOffset", `${nextOffset}`);
 
-    const saved = window.localStorage.getItem(ENTRIES_VIEW_STORAGE_KEY);
-    if (saved === "week") {
-      setView("week");
-    }
-  }, [searchParams, setView]);
+      const query = params.toString();
+      router.replace(query ? `${pathname}?${query}` : pathname);
+    },
+    [pathname, router, searchParams]
+  );
 
   const onDelete = (entryId: string) => {
     startTransition(() => {
@@ -122,13 +120,7 @@ export default function EntriesPage() {
 
   return (
     <section className="space-y-6">
-      <div className="flex flex-wrap items-center justify-between gap-4">
-        <div className="space-y-2">
-          <h1 className="text-3xl font-semibold">Entries</h1>
-          <p className="text-muted-foreground">
-            Review, edit, and organize your tracked sessions.
-          </p>
-        </div>
+      <div className="flex justify-end">
         <EntriesViewToggle view={view} onChange={setView} />
       </div>
 
@@ -141,11 +133,15 @@ export default function EntriesPage() {
           onDelete={onDelete}
         />
       ) : (
-        <div className="relative left-1/2 w-[calc(100vw-0.75rem)] max-w-[calc(100vw-0.75rem)] -translate-x-1/2">
+        <div className="relative left-1/2 w-[calc(100vw-1rem)] max-w-[calc(100vw-1rem)] -translate-x-1/2 md:w-[calc(100vw-17rem)] md:max-w-[calc(100vw-17rem)]">
           <EntriesWeekCalendarView
             now={now}
+            weekOffset={weekOffset}
             tagMap={tagMap}
             onEdit={setEditingEntry}
+            onPrevWeek={() => setWeekOffset(weekOffset - 1)}
+            onNextWeek={() => setWeekOffset(weekOffset + 1)}
+            onCurrentWeek={() => setWeekOffset(0)}
             onCreateRange={(range) => {
               setEditingEntry(null);
               setCreatingRange(range);
@@ -159,13 +155,18 @@ export default function EntriesPage() {
           title="Create entry"
           subtitle="Add context and optional tags for this selected time block."
           submitLabel="Create entry"
+          showTimeFields
+          requireEndAt
+          initialStartAt={creatingRange.startAt}
+          initialEndAt={creatingRange.endAt}
           tags={tags ?? []}
           onClose={() => setCreatingRange(null)}
           onSubmit={async (payload) => {
-            await createEntryFromRange({
-              ...creatingRange,
+            await createEntryWithTimes({
               description: payload.description,
               tagIds: payload.tagIds,
+              startAt: payload.startAt,
+              endAt: payload.endAt,
             });
             setCreatingRange(null);
           }}

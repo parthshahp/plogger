@@ -2,9 +2,13 @@
 
 import { useEffect, useMemo, useState } from "react";
 import { useLiveQuery } from "dexie-react-hooks";
+import EntriesWorkspace from "@/components/entries/entries-workspace";
+import { EntryFormModal } from "@/components/entries/entry-form-modal";
 import { Button } from "@/components/ui/button";
+import { useKeyboardShortcuts } from "@/hooks/use-keyboard-shortcuts";
 import { db, type Entry, type Tag } from "@/lib/db";
-import { startTimer, stopTimer, updateRunningEntry } from "@/lib/data";
+import { SHORTCUTS } from "@/lib/shortcuts";
+import { createEntryWithTimes, stopTimer, updateRunningEntry } from "@/lib/data";
 import { formatDuration, formatTimestamp } from "@/lib/time";
 
 function getTodayRange() {
@@ -72,17 +76,24 @@ export default function Home() {
 
   const tagMap = useMemo(() => buildTagMap(tags ?? []), [tags]);
 
+  useKeyboardShortcuts(
+    useMemo(
+      () => [
+        {
+          ...SHORTCUTS.openStartTimer,
+          onKeyDown: () => {
+            setIsEditOpen(false);
+            setIsStartOpen(true);
+          },
+        },
+      ],
+      []
+    )
+  );
+
   return (
     <section className="space-y-6">
-      <div className="space-y-2">
-        <h1 className="text-3xl font-semibold">Dashboard</h1>
-        <p className="text-muted-foreground">
-          Your local-first time tracker. Start a timer, assign optional tags,
-          and keep moving even when offline.
-        </p>
-      </div>
-
-      <div className="grid gap-4 lg:grid-cols-[2fr,1fr]">
+      <div className="grid gap-4 md:grid-cols-[2fr_1fr]">
         <div>
           {activeEntry ? (
             <RunningTimerCard
@@ -101,20 +112,26 @@ export default function Home() {
           <p className="mt-2 text-lg font-semibold">
             {formatDuration(todayTotal ?? 0)} logged
           </p>
-          <p className="mt-2 text-sm text-muted-foreground">
-            Reports arrive in Milestone 4.
-          </p>
         </div>
       </div>
 
       {isStartOpen ? (
         <EntryFormModal
           title="Start a timer"
+          subtitle="Add context and optional tags before starting this timer."
           submitLabel="Start timer"
+          showTimeFields
+          initialStartAt={now}
+          initialEndAt={null}
           tags={tags ?? []}
           onClose={() => setIsStartOpen(false)}
           onSubmit={async (payload) => {
-            await startTimer(payload);
+            await createEntryWithTimes({
+              description: payload.description,
+              tagIds: payload.tagIds,
+              startAt: payload.startAt,
+              endAt: payload.endAt,
+            });
             setIsStartOpen(false);
           }}
         />
@@ -123,6 +140,7 @@ export default function Home() {
       {isEditOpen && activeEntry ? (
         <EntryFormModal
           title="Edit running entry"
+          subtitle="Update details for the currently running timer."
           submitLabel="Save changes"
           tags={tags ?? []}
           initialDescription={activeEntry.description}
@@ -138,6 +156,8 @@ export default function Home() {
           }}
         />
       ) : null}
+
+      <EntriesWorkspace now={now} />
     </section>
   );
 }
@@ -215,103 +235,5 @@ function TagPill({ tag }: { tag: Tag }) {
       />
       {tag.name}
     </span>
-  );
-}
-
-function EntryFormModal({
-  title,
-  submitLabel,
-  tags,
-  initialDescription = "",
-  initialTagIds = [],
-  onSubmit,
-  onClose,
-}: {
-  title: string;
-  submitLabel: string;
-  tags: Tag[];
-  initialDescription?: string;
-  initialTagIds?: string[];
-  onSubmit: (payload: { description: string; tagIds: string[] }) => Promise<void>;
-  onClose: () => void;
-}) {
-  const [description, setDescription] = useState(initialDescription);
-  const [selectedTags, setSelectedTags] = useState<string[]>(initialTagIds);
-  const [isSaving, setIsSaving] = useState(false);
-
-  const onToggleTag = (tagId: string) => {
-    setSelectedTags((prev) =>
-      prev.includes(tagId) ? prev.filter((id) => id !== tagId) : [...prev, tagId]
-    );
-  };
-
-  const onSubmitForm = async () => {
-    if (isSaving) return;
-    setIsSaving(true);
-    await onSubmit({ description, tagIds: selectedTags });
-    setIsSaving(false);
-  };
-
-  return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 px-6">
-      <div className="w-full max-w-2xl rounded-lg border bg-background p-8 shadow-xl">
-        <div>
-          <div>
-            <h2 className="text-xl font-semibold">{title}</h2>
-            <p className="mt-1 text-sm text-muted-foreground">
-              Add context and optional tags while the timer runs.
-            </p>
-          </div>
-        </div>
-
-        <div className="mt-6 grid gap-4 lg:grid-cols-[2fr,1fr]">
-          <div>
-            <label className="text-xs uppercase text-muted-foreground">
-              Description
-            </label>
-            <input
-              className="mt-2 w-full rounded-md border bg-background px-4 py-3 text-sm outline-none"
-              value={description}
-              onChange={(event) => setDescription(event.target.value)}
-              placeholder="What are you working on?"
-            />
-          </div>
-          <div>
-            <p className="text-xs uppercase text-muted-foreground">Tags</p>
-            <div className="mt-2 flex flex-wrap gap-2">
-              {tags.length === 0 && (
-                <span className="text-sm text-muted-foreground">
-                  Add tags in the Tags page.
-                </span>
-              )}
-              {tags.map((tag) => (
-                <Button
-                  key={tag.id}
-                  type="button"
-                  size="sm"
-                  variant={selectedTags.includes(tag.id) ? "default" : "outline"}
-                  onClick={() => onToggleTag(tag.id)}
-                >
-                  <span
-                    className="h-2 w-2 rounded-full"
-                    style={{ backgroundColor: tag.color || "#ffffff" }}
-                  />
-                  {tag.name}
-                </Button>
-              ))}
-            </div>
-          </div>
-        </div>
-
-        <div className="mt-8 flex flex-wrap justify-end gap-3">
-          <Button type="button" variant="outline" onClick={onClose}>
-            Cancel
-          </Button>
-          <Button type="button" onClick={onSubmitForm}>
-            {isSaving ? "Saving..." : submitLabel}
-          </Button>
-        </div>
-      </div>
-    </div>
   );
 }

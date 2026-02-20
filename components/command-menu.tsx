@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import {
   CalendarIcon,
@@ -22,17 +22,9 @@ import {
   CommandSeparator,
   CommandShortcut,
 } from "@/components/ui/command";
+import { useKeyboardShortcuts } from "@/hooks/use-keyboard-shortcuts";
+import { SHORTCUTS } from "@/lib/shortcuts";
 import { getPreferredTheme, toggleTheme } from "@/lib/theme";
-
-function isEditableElement(target: EventTarget | null) {
-  if (!(target instanceof HTMLElement)) return false;
-
-  return Boolean(
-    target.closest(
-      'input, textarea, select, [contenteditable="true"], [role="textbox"]'
-    )
-  );
-}
 
 export default function CommandMenu() {
   const router = useRouter();
@@ -47,20 +39,19 @@ export default function CommandMenu() {
     return navigator.platform.toLowerCase().includes("mac") ? "⌘K" : "Ctrl+K";
   }, []);
 
-  useEffect(() => {
-    const onKeyDown = (event: KeyboardEvent) => {
-      if (event.key.toLowerCase() !== "k") return;
-      if (!(event.metaKey || event.ctrlKey)) return;
-      if (event.altKey || event.shiftKey) return;
-      if (isEditableElement(event.target)) return;
-
-      event.preventDefault();
-      setOpen((isOpen) => !isOpen);
-    };
-
-    document.addEventListener("keydown", onKeyDown);
-    return () => document.removeEventListener("keydown", onKeyDown);
-  }, []);
+  useKeyboardShortcuts(
+    useMemo(
+      () => [
+        {
+          ...SHORTCUTS.openCommandMenu,
+          onKeyDown: () => {
+            setOpen((isOpen) => !isOpen);
+          },
+        },
+      ],
+      []
+    )
+  );
 
   const goTo = (href: string) => {
     setOpen(false);
@@ -101,13 +92,9 @@ export default function CommandMenu() {
           <CommandEmpty>No results found.</CommandEmpty>
 
           <CommandGroup heading="Navigation">
-            <CommandItem onSelect={() => goTo("/")}>
+            <CommandItem onSelect={() => goTo("/?view=list")}>
               <HomeIcon className="size-4" />
-              Dashboard
-            </CommandItem>
-            <CommandItem onSelect={() => goTo("/entries")}>
-              <CalendarIcon className="size-4" />
-              Entries
+              Workspace
             </CommandItem>
             <CommandItem onSelect={() => goTo("/tags")}>
               <TagsIcon className="size-4" />
@@ -121,14 +108,14 @@ export default function CommandMenu() {
 
           <CommandSeparator />
 
-          <CommandGroup heading="Entries Views">
-            <CommandItem onSelect={() => goTo("/entries?view=list")}>
+          <CommandGroup heading="Workspace Views">
+            <CommandItem onSelect={() => goTo("/?view=list")}>
               <CalendarIcon className="size-4" />
-              Entries list view
+              List view
             </CommandItem>
-            <CommandItem onSelect={() => goTo("/entries?view=week")}>
+            <CommandItem onSelect={() => goTo("/?view=week")}>
               <CalendarIcon className="size-4" />
-              Entries week view
+              Week view
             </CommandItem>
           </CommandGroup>
 
